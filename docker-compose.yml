@@ -1,0 +1,42 @@
+services:
+
+  # WhatsApp HTTP API (бесплатный, без Docker Hub проблем)
+  waha:
+    image: devlikeapro/waha
+    container_name: tgblast_waha
+    restart: unless-stopped
+    ports:
+      - "3100:3000"
+    volumes:
+      - waha_sessions:/app/.sessions
+
+  # Backend (Node.js)
+  backend:
+    build: ./backend
+    container_name: tgblast_backend
+    restart: unless-stopped
+    environment:
+      - PORT=3001
+      - BOT_TOKEN=${BOT_TOKEN}
+      - FIVESIM_API_KEY=${FIVESIM_API_KEY}
+      - WAHA_URL=http://waha:3000
+    depends_on:
+      - waha
+    volumes:
+      - backend_sessions:/app/.wa_sessions
+      - backend_auth:/app/.wwebjs_auth
+
+  # Frontend (React → nginx)
+  frontend:
+    build: ./frontend
+    container_name: tgblast_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  waha_sessions:
+  backend_sessions:
+  backend_auth:

@@ -24,6 +24,7 @@ export const sendTestMessage = (data) => api.post('/telegram/test', data);
 // WhatsApp
 export const getWaStatus = () => api.get('/whatsapp/status');
 export const getWaQr = () => api.get('/whatsapp/qr');
+export const waConnectByPhone = (phone) => api.post('/whatsapp/connect', { phone });
+export const waConnectByQr = () => api.post('/whatsapp/connect-qr');
 export const sendWaTest = (data) => api.post('/whatsapp/test', data);
 export const waLogout = () => api.post('/whatsapp/logout');
-export const waReconnect = () => api.post('/whatsapp/reconnect');

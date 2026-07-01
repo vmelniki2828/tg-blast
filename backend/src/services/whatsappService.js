@@ -4,16 +4,24 @@ import qrcode from 'qrcode';
 
 let client = null;
 let qrDataUrl = null;
+let pairingCode = null;
+let pairingPhone = null; // номер для которого запрашиваем код
 let waStatus = 'disconnected';
 
-export const formatPhone = (phone) => phone.replace(/\D/g, '') + '@c.us';
-export const getWaStatus = () => ({ status: waStatus, hasQr: !!qrDataUrl });
+export const getWaStatus = () => ({
+  status: waStatus,
+  hasQr: !!qrDataUrl,
+  pairingCode: pairingCode || null,
+});
 export const getQrDataUrl = () => qrDataUrl;
 
-export const initWhatsApp = () => {
+export const initWhatsApp = (phone = null) => {
   if (client) return;
   console.log('Initializing WhatsApp client...');
   waStatus = 'initializing';
+  pairingPhone = phone ? phone.replace(/\D/g, '') : null;
+  pairingCode = null;
+  qrDataUrl = null;
 
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: '.wwebjs_auth' }),
@@ -24,24 +32,49 @@ export const initWhatsApp = () => {
   });
 
   client.on('qr', async (qr) => {
-    console.log('WhatsApp QR ready — scan with your phone');
-    waStatus = 'qr_ready';
-    qrDataUrl = await qrcode.toDataURL(qr).catch(() => null);
+    if (pairingPhone) {
+      waStatus = 'qr_ready';
+      console.log(`Requesting pairing code for ${pairingPhone}...`);
+      // Небольшая задержка — WhatsApp должен успеть инициализироваться
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const code = await client.requestPairingCode(pairingPhone);
+        pairingCode = code;
+        console.log(`✓ Pairing code: ${code}`);
+      } catch (err) {
+        console.error('✗ Pairing code failed:', err.message, err.stack);
+        // Показываем QR как запасной вариант
+        qrDataUrl = await qrcode.toDataURL(qr).catch(() => null);
+      }
+    } else {
+      console.log('WhatsApp QR ready — scan with your phone');
+      waStatus = 'qr_ready';
+      qrDataUrl = await qrcode.toDataURL(qr).catch(() => null);
+    }
   });
 
-  client.on('authenticated', () => { qrDataUrl = null; });
+  client.on('authenticated', () => {
+    qrDataUrl = null;
+    pairingCode = null;
+  });
 
   client.on('ready', () => {
     console.log('WhatsApp ready');
     waStatus = 'ready';
     qrDataUrl = null;
+    pairingCode = null;
   });
 
-  client.on('auth_failure', () => { waStatus = 'disconnected'; client = null; });
+  client.on('auth_failure', () => {
+    waStatus = 'disconnected';
+    client = null;
+    pairingCode = null;
+  });
 
   client.on('disconnected', () => {
     waStatus = 'disconnected';
     qrDataUrl = null;
+    pairingCode = null;
     client = null;
   });
 
@@ -58,7 +91,6 @@ export const sendWhatsApp = async (phone, text) => {
   }
   try {
     const digits = phone.replace(/\D/g, '');
-    // Получаем реальный ID номера — решает ошибку "No LID for user"
     const numberId = await client.getNumberId(digits);
     if (!numberId) {
       return { ok: false, error: `Номер ${digits} не зарегистрирован в WhatsApp` };
@@ -75,12 +107,15 @@ export const logoutWhatsApp = async () => {
   client = null;
   waStatus = 'disconnected';
   qrDataUrl = null;
+  pairingCode = null;
+  pairingPhone = null;
 };
 
-export const reconnectWhatsApp = async () => {
+export const reconnectWhatsApp = async (phone = null) => {
   if (client) await client.destroy().catch(() => {});
   client = null;
   qrDataUrl = null;
+  pairingCode = null;
   waStatus = 'disconnected';
-  initWhatsApp();
+  initWhatsApp(phone);
 };

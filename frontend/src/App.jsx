@@ -5,6 +5,7 @@ import Contacts from './pages/Contacts.jsx';
 import Campaigns from './pages/Campaigns.jsx';
 import History from './pages/History.jsx';
 import WhatsApp from './pages/WhatsApp.jsx';
+import Accounts from './pages/Accounts.jsx';
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="/campaigns"  element={<Campaigns />} />
           <Route path="/history"    element={<History />} />
           <Route path="/whatsapp"   element={<WhatsApp />} />
+          <Route path="/accounts"   element={<Accounts />} />
         </Routes>
       </main>
     </div>

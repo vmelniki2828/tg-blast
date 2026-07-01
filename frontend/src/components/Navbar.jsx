@@ -9,6 +9,7 @@ const NAV = [
   { to: '/campaigns',  label: '📨 Рассылка' },
   { to: '/history',    label: '📋 История' },
   { to: '/whatsapp',   label: '💬 WhatsApp' },
+  { to: '/accounts',   label: '📱 WA Аккаунты' },
 ];
 
 export default function Navbar() {

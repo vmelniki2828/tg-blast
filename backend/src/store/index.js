@@ -166,3 +166,58 @@ export const SendLogs = {
     return Promise.resolve(log);
   },
 };
+
+// ─── WA Accounts (Evolution API pool) ───────────────────────────────────────
+
+let waAccounts = [];
+
+export const WaAccounts = {
+  getAll() {
+    return [...waAccounts];
+  },
+  getById(id) {
+    return waAccounts.find(a => a._id === id) || null;
+  },
+  getReady() {
+    return waAccounts.filter(a => a.status === 'ready');
+  },
+  create(data) {
+    const account = {
+      _id: makeId(),
+      instanceName: data.instanceName,
+      phone: data.phone || '',
+      label: data.label || data.phone || data.instanceName,
+      status: 'disconnected', // disconnected | connecting | ready | banned
+      sentToday: 0,
+      sentTotal: 0,
+      lastUsed: null,
+      fiveSimOrderId: data.fiveSimOrderId || null,
+      error: null,
+      createdAt: now(),
+    };
+    waAccounts.push(account);
+    return account;
+  },
+  update(id, data) {
+    const i = waAccounts.findIndex(a => a._id === id);
+    if (i === -1) return null;
+    waAccounts[i] = { ...waAccounts[i], ...data };
+    return waAccounts[i];
+  },
+  delete(id) {
+    const i = waAccounts.findIndex(a => a._id === id);
+    if (i === -1) return false;
+    waAccounts.splice(i, 1);
+    return true;
+  },
+  // Выбрать наименее загруженный готовый аккаунт
+  getLeastLoaded() {
+    const ready = waAccounts.filter(a => a.status === 'ready');
+    if (!ready.length) return null;
+    return ready.sort((a, b) => a.sentToday - b.sentToday)[0];
+  },
+  // Сбросить счётчики отправок (вызывать каждую ночь)
+  resetDailyCounters() {
+    waAccounts.forEach(a => { a.sentToday = 0; });
+  },
+};

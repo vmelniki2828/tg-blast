@@ -2,6 +2,8 @@ import cron from 'node-cron';
 import { Campaigns, Contacts, SendLogs } from '../store/index.js';
 import { sendMessage as sendTelegram } from './telegramService.js';
 import { sendWhatsApp, getWaStatus } from './whatsappService.js';
+import { sendViaPool } from './waPoolService.js';
+import { WaAccounts } from '../store/index.js';
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -26,10 +28,16 @@ const sendOne = async ({ campaign, contact, text, channel }) => {
   } else if (channel === 'whatsapp') {
     if (!contact.phone) {
       result = { ok: false, error: 'Нет phone для WhatsApp' };
-    } else if (getWaStatus().status !== 'ready') {
-      result = { ok: false, error: 'WhatsApp не подключён' };
     } else {
-      result = await sendWhatsApp(contact.phone, text);
+      // Сначала пробуем пул аккаунтов, потом одиночный клиент
+      const poolReady = WaAccounts.getLeastLoaded();
+      if (poolReady) {
+        result = await sendViaPool(contact.phone, text);
+      } else if (getWaStatus().status === 'ready') {
+        result = await sendWhatsApp(contact.phone, text);
+      } else {
+        result = { ok: false, error: 'Нет готовых WhatsApp аккаунтов' };
+      }
     }
     await SendLogs.create({
       campaign: campaign._id,
