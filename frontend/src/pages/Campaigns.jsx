@@ -137,8 +137,6 @@ export default function Campaigns() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 5000); // автообновление статусов
-    return () => clearInterval(t);
   }, []);
 
   const handleSave = async (data) => {

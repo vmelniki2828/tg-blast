@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import AccountWizard from '../components/AccountWizard.jsx';
 
@@ -38,7 +38,6 @@ export default function Accounts() {
   const [form, setForm] = useState({ phone: '', label: '', country: 'any', count: 1, orderId: '' });
   const [error, setError] = useState('');
   const [pairingCode, setPairingCode] = useState(null);
-  const pollRef = useRef(null);
 
   const load = async () => {
     try {
@@ -67,8 +66,6 @@ export default function Accounts() {
     load();
     checkHealth();
     checkBalance();
-    pollRef.current = setInterval(load, 5000);
-    return () => clearInterval(pollRef.current);
   }, []);
 
   const handleAddManual = async (e) => {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { getWaStatus, getWaQr, waConnectByPhone, waConnectByQr, sendWaTest, waLogout } from '../api/index.js';
 
 const STATUS_LABELS = {
@@ -19,7 +19,6 @@ export default function WhatsApp() {
   const [testText, setTestText] = useState('Тестовое сообщение из TG Blast 👋');
   const [testResult, setTestResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const pollRef = useRef(null);
 
   const refresh = async () => {
     try {
@@ -40,8 +39,6 @@ export default function WhatsApp() {
 
   useEffect(() => {
     refresh();
-    pollRef.current = setInterval(refresh, 3000);
-    return () => clearInterval(pollRef.current);
   }, []);
 
   const handleConnectPhone = async (e) => {
@@ -103,9 +100,12 @@ export default function WhatsApp() {
               {(status === 'initializing') && <div className="spinner" style={{ width: 14, height: 14 }} />}
             </div>
           </div>
-          {status === 'ready' && (
-            <button className="btn-danger btn-sm" onClick={handleLogout}>Выйти</button>
-          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-secondary btn-sm" onClick={refresh}>Обновить</button>
+            {status === 'ready' && (
+              <button className="btn-danger btn-sm" onClick={handleLogout}>Выйти</button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -200,7 +200,8 @@ export default function WhatsApp() {
       {status === 'initializing' && !pairingCode && !qr && (
         <div className="card" style={{ marginBottom: 20, textAlign: 'center', padding: 40 }}>
           <div className="spinner" style={{ width: 32, height: 32, margin: '0 auto 12px' }} />
-          <div style={{ color: 'var(--text-muted)' }}>Запуск клиента... (~15–30 сек)</div>
+          <div style={{ color: 'var(--text-muted)', marginBottom: 16 }}>Запуск клиента... (~15–30 сек)</div>
+          <button className="btn-secondary btn-sm" onClick={refresh}>Проверить статус</button>
         </div>
       )}
 

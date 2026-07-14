@@ -21,14 +21,9 @@ export default function Navbar() {
       .then(r => setBot(r.data.bot))
       .catch(() => setBot(false));
 
-    const pollWa = () =>
-      getWaStatus()
-        .then(r => setWaStatus(r.data.status))
-        .catch(() => setWaStatus('disconnected'));
-
-    pollWa();
-    const t = setInterval(pollWa, 5000);
-    return () => clearInterval(t);
+    getWaStatus()
+      .then(r => setWaStatus(r.data.status))
+      .catch(() => setWaStatus('disconnected'));
   }, []);
 
   const waColor = waStatus === 'ready' ? 'var(--success)' : waStatus === 'qr_ready' ? 'var(--warning)' : 'var(--danger)';
