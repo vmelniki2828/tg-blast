@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { WaAccounts } from '../store/index.js';
-import { startClientWithPairing, stopClient, register5SimAccount } from '../services/waPoolService.js';
+import { startClientWithPairing, startClientWithQr, stopClient, register5SimAccount } from '../services/waPoolService.js';
 import { buyNumber, getBalance } from '../services/fiveSimService.js';
 
 const router = Router();
@@ -33,6 +33,26 @@ router.post('/add-manual', async (req, res) => {
   const pairingCode = await startClientWithPairing(account);
 
   res.json({ account: WaAccounts.getById(account._id), pairingCode });
+});
+
+// POST /api/accounts/add-qr — подключить новый аккаунт по QR-коду
+router.post('/add-qr', async (req, res) => {
+  const { label } = req.body;
+  const account = WaAccounts.create({ label: label || 'Новый аккаунт' });
+
+  res.json({ account });
+
+  startClientWithQr(account).catch(err => {
+    WaAccounts.update(account._id, { status: 'disconnected', error: err.message });
+  });
+});
+
+// GET /api/accounts/:id/qr — получить QR-картинку для аккаунта
+router.get('/:id/qr', (req, res) => {
+  const account = WaAccounts.getById(req.params.id);
+  if (!account) return res.status(404).json({ error: 'Не найден' });
+  if (!account.qr) return res.status(404).json({ error: 'QR недоступен' });
+  res.json({ qr: account.qr });
 });
 
 // POST /api/accounts/add-5sim — пользователь сам купил номер на 5sim

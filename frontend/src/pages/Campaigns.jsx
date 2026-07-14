@@ -154,7 +154,10 @@ export default function Campaigns() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700 }}>Рассылки</h1>
-        <button className="btn-primary" onClick={() => setModal(true)}>+ Новая рассылка</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn-secondary" onClick={load}>Обновить</button>
+          <button className="btn-primary" onClick={() => setModal(true)}>+ Новая рассылка</button>
+        </div>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

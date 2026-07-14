@@ -8,6 +8,7 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
   DisconnectReason,
 } from '@whiskeysockets/baileys';
+import qrcode from 'qrcode';
 import { WaAccounts } from '../store/index.js';
 import { waitForSms, confirmOrder, cancelOrder } from './fiveSimService.js';
 import path from 'path';
@@ -23,11 +24,13 @@ const sockets = new Map();
  * Если registered=false — только создаём сокет, потом registerWithSms.
  */
 export const startSocket = async (account) => {
-  const { _id, phone } = account;
+  const { _id } = account;
   if (sockets.has(_id)) return sockets.get(_id).sock;
 
   const { version } = await fetchLatestBaileysVersion();
-  const sessionPath = path.join(SESSIONS_DIR, `wa_${phone}`);
+  // Сессия привязана к _id аккаунта, а не к номеру — номер не всегда
+  // известен заранее (QR-подключение) и не гарантированно уникален.
+  const sessionPath = path.join(SESSIONS_DIR, _id);
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
     const noop = () => {};
@@ -48,15 +51,32 @@ export const startSocket = async (account) => {
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
+  sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+    const label = account.phone || account.label || _id;
+
+    if (qr) {
+      const dataUrl = await qrcode.toDataURL(qr).catch(() => null);
+      console.log(`[${label}] QR ready`);
+      WaAccounts.update(_id, { qr: dataUrl, status: 'connecting' });
+    }
+
     if (connection === 'open') {
-      console.log(`[${phone}] Connected ✓`);
-      WaAccounts.update(_id, { status: 'ready', pairingCode: null, error: null });
+      // При QR-подключении номер заранее неизвестен — берём его из сессии.
+      const waNumber = sock.user?.id?.split(':')[0]?.split('@')[0] || account.phone;
+      console.log(`[${waNumber}] Connected ✓`);
+      WaAccounts.update(_id, {
+        status: 'ready',
+        pairingCode: null,
+        qr: null,
+        error: null,
+        phone: waNumber,
+        label: account.phone ? account.label : (account.label || waNumber),
+      });
     } else if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = code === DisconnectReason.loggedOut;
-      console.log(`[${phone}] Disconnected (code ${code}, loggedOut: ${loggedOut})`);
-      WaAccounts.update(_id, { status: 'disconnected' });
+      console.log(`[${label}] Disconnected (code ${code}, loggedOut: ${loggedOut})`);
+      WaAccounts.update(_id, { status: 'disconnected', qr: null });
       sockets.delete(_id);
 
       if (!loggedOut) {
@@ -171,6 +191,28 @@ export const startClientWithPairing = async (account) => {
     console.error(`[${account.phone}] Pairing code error:`, err.message);
     WaAccounts.update(account._id, { error: 'Не удалось получить pairing code' });
     return null;
+  }
+};
+
+/**
+ * Подключить новый аккаунт по QR-коду.
+ * Номер телефона заранее неизвестен — станет известен после сканирования.
+ */
+export const startClientWithQr = async (account) => {
+  WaAccounts.update(account._id, { status: 'connecting', qr: null, pairingCode: null });
+  await startSocket(account);
+};
+
+/**
+ * Восстановить все сохранённые аккаунты после рестарта backend.
+ * Переиспользует сессии Baileys на диске — новый QR/код не нужен,
+ * если WhatsApp не разлогинил устройство за это время.
+ */
+export const reconnectAllAccounts = async () => {
+  for (const account of WaAccounts.getAll()) {
+    startSocket(account).catch(err => {
+      WaAccounts.update(account._id, { status: 'disconnected', error: err.message });
+    });
   }
 };
 

@@ -1,10 +1,18 @@
 /**
  * In-memory хранилище — заменяет MongoDB для быстрого теста.
- * Данные живут пока запущен сервер.
+ * Данные живут пока запущен сервер, кроме WaAccounts — тот пул
+ * сохраняется на диск, т.к. переподключать WhatsApp-аккаунты
+ * заново при каждом рестарте backend неудобно.
  */
+
+import fs from 'fs';
+import path from 'path';
 
 const makeId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 const now = () => new Date();
+
+const DATA_DIR = path.resolve('.data');
+const WA_ACCOUNTS_FILE = path.join(DATA_DIR, 'wa-accounts.json');
 
 // ─── Contacts ───────────────────────────────────────────────────────────────
 
@@ -169,7 +177,34 @@ export const SendLogs = {
 
 // ─── WA Accounts (Evolution API pool) ───────────────────────────────────────
 
-let waAccounts = [];
+const loadWaAccounts = () => {
+  try {
+    const raw = fs.readFileSync(WA_ACCOUNTS_FILE, 'utf-8');
+    // При загрузке сокеты ещё не подняты — сбрасываем живое состояние,
+    // reconnectAllAccounts() в waPoolService переустановит его сам.
+    return JSON.parse(raw).map(a => ({
+      ...a,
+      status: 'connecting',
+      qr: null,
+      pairingCode: null,
+      createdAt: new Date(a.createdAt),
+      lastUsed: a.lastUsed ? new Date(a.lastUsed) : null,
+    }));
+  } catch {
+    return [];
+  }
+};
+
+const persistWaAccounts = () => {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(WA_ACCOUNTS_FILE, JSON.stringify(waAccounts, null, 2));
+  } catch (err) {
+    console.error('Не удалось сохранить пул WA аккаунтов:', err.message);
+  }
+};
+
+let waAccounts = loadWaAccounts();
 
 export const WaAccounts = {
   getAll() {
@@ -192,22 +227,27 @@ export const WaAccounts = {
       sentTotal: 0,
       lastUsed: null,
       fiveSimOrderId: data.fiveSimOrderId || null,
+      qr: null,
+      pairingCode: null,
       error: null,
       createdAt: now(),
     };
     waAccounts.push(account);
+    persistWaAccounts();
     return account;
   },
   update(id, data) {
     const i = waAccounts.findIndex(a => a._id === id);
     if (i === -1) return null;
     waAccounts[i] = { ...waAccounts[i], ...data };
+    persistWaAccounts();
     return waAccounts[i];
   },
   delete(id) {
     const i = waAccounts.findIndex(a => a._id === id);
     if (i === -1) return false;
     waAccounts.splice(i, 1);
+    persistWaAccounts();
     return true;
   },
   // Выбрать наименее загруженный готовый аккаунт
@@ -219,5 +259,6 @@ export const WaAccounts = {
   // Сбросить счётчики отправок (вызывать каждую ночь)
   resetDailyCounters() {
     waAccounts.forEach(a => { a.sentToday = 0; });
+    persistWaAccounts();
   },
 };

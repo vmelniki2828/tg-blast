@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import AccountWizard from '../components/AccountWizard.jsx';
 
@@ -34,10 +34,14 @@ export default function Accounts() {
   const [health, setHealth] = useState(null);
   const [balance, setBalance] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [modal, setModal] = useState(null); // null | 'manual' | 'auto' | 'fivesim' | 'wizard'
+  const [modal, setModal] = useState(null); // null | 'manual' | 'qr' | 'auto' | 'fivesim' | 'wizard'
   const [form, setForm] = useState({ phone: '', label: '', country: 'any', count: 1, orderId: '' });
   const [error, setError] = useState('');
   const [pairingCode, setPairingCode] = useState(null);
+  const [qrImage, setQrImage] = useState(null);
+  const [qrAccountId, setQrAccountId] = useState(null);
+  const [qrStatus, setQrStatus] = useState(null);
+  const qrPollRef = useRef(null);
 
   const load = async () => {
     try {
@@ -83,6 +87,59 @@ export default function Accounts() {
       setLoading(false);
     }
   };
+
+  const stopQrPolling = () => {
+    clearInterval(qrPollRef.current);
+    qrPollRef.current = null;
+  };
+
+  // Poll работает только пока открыто окно QR-подключения — это не
+  // фоновое автообновление, а единственный способ узнать, что QR
+  // появился и что телефон его отсканировал.
+  const pollQrAccount = (id) => {
+    qrPollRef.current = setInterval(async () => {
+      try {
+        const r = await api.get('/accounts');
+        setAccounts(r.data);
+        const acc = r.data.find(a => a._id === id);
+        if (!acc) return;
+        setQrStatus(acc.status);
+        if (acc.qr) setQrImage(acc.qr);
+        if (acc.status === 'ready') {
+          setQrImage(null);
+          stopQrPolling();
+        }
+      } catch {}
+    }, 2500);
+  };
+
+  const handleOpenQr = async () => {
+    setModal('qr');
+    setError('');
+    setQrImage(null);
+    setQrStatus('connecting');
+    setLoading(true);
+    try {
+      const r = await api.post('/accounts/add-qr', { label: form.label });
+      setQrAccountId(r.data.account._id);
+      pollQrAccount(r.data.account._id);
+      load();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseQr = () => {
+    stopQrPolling();
+    setModal(null);
+    setQrAccountId(null);
+    setQrImage(null);
+    setQrStatus(null);
+  };
+
+  useEffect(() => () => stopQrPolling(), []);
 
   const handleAdd5sim = async (e) => {
     e.preventDefault();
@@ -141,7 +198,9 @@ export default function Accounts() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700 }}>WA Аккаунты</h1>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn-secondary" onClick={() => setModal('manual')}>+ Свой номер (WA)</button>
+          <button className="btn-secondary" onClick={load}>Обновить</button>
+          <button className="btn-secondary" onClick={handleOpenQr}>📷 По QR коду</button>
+          <button className="btn-secondary" onClick={() => setModal('manual')}>+ Свой номер (код)</button>
           <button className="btn-primary" onClick={() => setModal('wizard')}>🧙 Добавить через 5sim</button>
         </div>
       </div>
@@ -233,6 +292,38 @@ export default function Accounts() {
       </div>
 
       {/* Modals */}
+      {modal === 'qr' && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && handleCloseQr()}>
+          <div className="modal" style={{ textAlign: 'center' }}>
+            <h2>Подключить по QR коду</h2>
+            {error && <p className="error-msg">{error}</p>}
+            {qrImage ? (
+              <>
+                <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '12px 0' }}>
+                  WhatsApp → Настройки → Связанные устройства → Привязать устройство
+                </p>
+                <img src={qrImage} alt="QR" style={{ width: 240, height: 240, borderRadius: 12, border: '3px solid var(--border)' }} />
+              </>
+            ) : qrStatus === 'ready' ? (
+              <div style={{ padding: 24 }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>✅</div>
+                <div style={{ fontWeight: 600, color: 'var(--success)' }}>Подключено!</div>
+              </div>
+            ) : (
+              <div style={{ padding: 40 }}>
+                <div className="spinner" style={{ width: 32, height: 32, margin: '0 auto 12px' }} />
+                <div style={{ color: 'var(--text-muted)' }}>Генерируем QR... (~10–15 сек)</div>
+              </div>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={handleCloseQr}>
+                {qrStatus === 'ready' ? 'Готово' : 'Закрыть'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modal === 'manual' && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(null)}>
           <div className="modal">

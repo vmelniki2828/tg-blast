@@ -13,6 +13,7 @@ process.on('unhandledRejection', (err) => {
 import express from 'express';
 import cors from 'cors';
 import { startScheduler } from './services/schedulerService.js';
+import { reconnectAllAccounts } from './services/waPoolService.js';
 import contactsRouter from './routes/contacts.js';
 import campaignsRouter from './routes/campaigns.js';
 import logsRouter from './routes/logs.js';
@@ -40,4 +41,5 @@ app.get('/api/health', (_, res) => res.json({ status: 'ok', storage: 'in-memory'
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT} (in-memory storage)`);
   startScheduler();
+  reconnectAllAccounts();
 });
