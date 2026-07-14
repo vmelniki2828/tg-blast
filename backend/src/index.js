@@ -1,4 +1,15 @@
 import 'dotenv/config';
+
+// whatsapp-web.js иногда кидает необработанные ошибки из внутренних puppeteer
+// колбэков (переинжект скриптов после навигации страницы). Без этой страховки
+// такая ошибка валит весь процесс и вместе с ним Telegram/контакты/рассылки.
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err?.message || err);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('[unhandledRejection]', err?.message || err);
+});
+
 import express from 'express';
 import cors from 'cors';
 import { startScheduler } from './services/schedulerService.js';
