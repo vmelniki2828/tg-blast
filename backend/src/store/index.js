@@ -187,6 +187,9 @@ const loadWaAccounts = () => {
       status: 'connecting',
       qr: null,
       pairingCode: null,
+      warmup: a.warmup || false,
+      warmupSentToday: a.warmupSentToday || 0,
+      warmupSentTotal: a.warmupSentTotal || 0,
       createdAt: new Date(a.createdAt),
       lastUsed: a.lastUsed ? new Date(a.lastUsed) : null,
     }));
@@ -230,6 +233,9 @@ export const WaAccounts = {
       qr: null,
       pairingCode: null,
       error: null,
+      warmup: false,
+      warmupSentToday: 0,
+      warmupSentTotal: 0,
       createdAt: now(),
     };
     waAccounts.push(account);
@@ -258,7 +264,11 @@ export const WaAccounts = {
   },
   // Сбросить счётчики отправок (вызывать каждую ночь)
   resetDailyCounters() {
-    waAccounts.forEach(a => { a.sentToday = 0; });
+    waAccounts.forEach(a => { a.sentToday = 0; a.warmupSentToday = 0; });
     persistWaAccounts();
+  },
+  // Аккаунты, отмеченные для прогрева и готовые к отправке
+  getWarmupPool() {
+    return waAccounts.filter(a => a.warmup && a.status === 'ready');
   },
 };

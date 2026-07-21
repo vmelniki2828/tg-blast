@@ -78,7 +78,10 @@ export const runCampaign = async (campaign) => {
       const result = await sendOne({ campaign, contact, text: campaign.text, channel: ch });
       if (result?.ok) sent++;
       else failed++;
-      await delay(channel === 'telegram' ? 50 : 200);
+      // Для WhatsApp — случайная пауза 5-15с между сообщениями вместо
+      // фиксированной. Одинаковый интервал между отправками — один из
+      // главных сигналов, по которым WhatsApp детектит бота и банит номер.
+      await delay(ch === 'telegram' ? 50 : 5000 + Math.random() * 10000);
     }
   }
 

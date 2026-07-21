@@ -101,6 +101,15 @@ router.post('/add-auto', async (req, res) => {
   });
 });
 
+// POST /api/accounts/warmup — включить/выключить прогрев для набора аккаунтов
+router.post('/warmup', (req, res) => {
+  const { ids, enabled } = req.body;
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids обязателен' });
+
+  const updated = ids.map(id => WaAccounts.update(id, { warmup: !!enabled })).filter(Boolean);
+  res.json({ ok: true, updated: updated.length });
+});
+
 // DELETE /api/accounts/:id
 router.delete('/:id', async (req, res) => {
   const account = WaAccounts.getById(req.params.id);

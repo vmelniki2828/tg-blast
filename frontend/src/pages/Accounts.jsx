@@ -42,6 +42,7 @@ export default function Accounts() {
   const [qrAccountId, setQrAccountId] = useState(null);
   const [qrStatus, setQrStatus] = useState(null);
   const qrPollRef = useRef(null);
+  const [selected, setSelected] = useState(new Set());
 
   const load = async () => {
     try {
@@ -191,6 +192,21 @@ export default function Accounts() {
     load();
   };
 
+  const toggleSelect = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const setWarmupForSelected = async (enabled) => {
+    if (!selected.size) return;
+    await api.post('/accounts/warmup', { ids: [...selected], enabled }).catch(() => {});
+    setSelected(new Set());
+    load();
+  };
+
   const ready = accounts.filter(a => a.status === 'ready').length;
 
   return (
@@ -228,6 +244,16 @@ export default function Accounts() {
         </div>
       </div>
 
+      {/* Массовые действия по прогреву */}
+      {selected.size > 0 && (
+        <div className="card" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Выбрано: {selected.size}</span>
+          <button className="btn-primary btn-sm" onClick={() => setWarmupForSelected(true)}>🔥 Включить прогрев</button>
+          <button className="btn-secondary btn-sm" onClick={() => setWarmupForSelected(false)}>Выключить прогрев</button>
+          <button className="btn-secondary btn-sm" onClick={() => setSelected(new Set())}>Снять выбор</button>
+        </div>
+      )}
+
       {/* Таблица аккаунтов */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {accounts.length === 0 ? (
@@ -239,8 +265,10 @@ export default function Accounts() {
           <table>
             <thead>
               <tr>
+                <th></th>
                 <th>Номер</th>
                 <th>Статус</th>
+                <th>Прогрев</th>
                 <th>Сегодня</th>
                 <th>Всего</th>
                 <th>Последняя отправка</th>
@@ -250,6 +278,13 @@ export default function Accounts() {
             <tbody>
               {accounts.map(a => (
                 <tr key={a._id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(a._id)}
+                      onChange={() => toggleSelect(a._id)}
+                    />
+                  </td>
                   <td>
                     <div style={{ fontWeight: 500 }}>{a.label}</div>
                     {a.pairingCode && (
@@ -272,6 +307,15 @@ export default function Accounts() {
                       {a.status === 'connecting' && <span className="spinner" style={{ width: 10, height: 10, marginRight: 5 }} />}
                       {STATUS_LABEL[a.status] || a.status}
                     </span>
+                  </td>
+                  <td>
+                    {a.warmup ? (
+                      <span style={{ color: 'var(--success)', fontSize: 13, fontWeight: 500 }}>
+                        🔥 {a.warmupSentToday || 0}/сегодня
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>—</span>
+                    )}
                   </td>
                   <td>{a.sentToday || 0}</td>
                   <td>{a.sentTotal || 0}</td>

@@ -231,6 +231,15 @@ export const sendViaClient = async (accountId, phone, text) => {
   try {
     const digits = phone.replace(/\D/g, '');
     const jid = `${digits}@s.whatsapp.net`;
+
+    // Имитация набора текста перед отправкой — мгновенная доставка без
+    // "печатает..." — один из признаков, по которым WhatsApp отличает
+    // бота от живого человека.
+    await entry.sock.presenceSubscribe(jid).catch(() => {});
+    await entry.sock.sendPresenceUpdate('composing', jid).catch(() => {});
+    await delay(1500 + Math.random() * 2500);
+    await entry.sock.sendPresenceUpdate('paused', jid).catch(() => {});
+
     await entry.sock.sendMessage(jid, { text });
     WaAccounts.update(accountId, {
       sentToday: (account.sentToday || 0) + 1,
